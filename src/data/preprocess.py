@@ -43,6 +43,8 @@ def clean(df):
     df = df.drop_duplicates(subset="id")  # only catches true duplicate rows, not title collisions
 
     df["soup"] = df.apply(extract_soup, axis=1)
+    
+    df = df.reset_index(drop=True)
     return df
 
 
