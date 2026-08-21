@@ -26,6 +26,25 @@ def search(query, df, embeddings, model, k=10):
 
     return results.head(k)[["soup", "similarity", "content_type"]]
 
+def hybrid_search(query, df, embeddings, model, prefs, k=5):
+    base_results = search(query, df, embeddings, model, k=20)  # wider pool to re-rank from
+
+    def boost_score(row):
+        score = row["similarity"]
+        text = row["soup"].lower()
+        for g in prefs.get("genres", []):
+            if g.lower() in text:
+                score += 0.05
+        for t in prefs.get("themes", []):
+            if t.lower() in text:
+                score += 0.05
+        for e in prefs.get("exclude", []):
+            if e.lower() in text:
+                score -= 0.1
+        return score
+
+    base_results["boosted_score"] = base_results.apply(boost_score, axis=1)
+    return base_results.sort_values("boosted_score", ascending=False).head(k)
 
 if __name__ == "__main__":
     df, embeddings = load_data()
