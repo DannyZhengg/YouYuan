@@ -51,13 +51,11 @@ def run_eval(k=5, mode="baseline"):
         # NEW: branch on mode instead of a single use_expansion flag
         if mode == "expansion":
             search_query = expand_query(raw_query)
-            print(f"DEBUG: '{raw_query}' -> '{search_query[:60]}'")
             time.sleep(0.5)
             results = search(search_query, df, embeddings, model, k=k)
 
         elif mode == "hybrid":
             prefs = extract_preferences(raw_query)
-            print(f"DEBUG: '{raw_query[:40]}' -> genres={prefs.get('genres')}, themes={prefs.get('themes')}")
             time.sleep(0.5)
             results = hybrid_search(raw_query, df, embeddings, model, prefs, k=k)
 
@@ -85,9 +83,6 @@ def run_eval(k=5, mode="baseline"):
 
 
 if __name__ == "__main__":
-    hyb_p, hyb_r = run_eval(k=5, mode="hybrid")
-
-    '''
     base_p, base_r = run_eval(k=5, mode="baseline")
     exp_p, exp_r = run_eval(k=5, mode="expansion")
     hyb_p, hyb_r = run_eval(k=5, mode="hybrid")
@@ -98,4 +93,3 @@ if __name__ == "__main__":
     print(f"Baseline           -> P@5: {base_p:.3f} | R@5: {base_r:.3f}")
     print(f"+ Expansion (bad)  -> P@5: {exp_p:.3f} | R@5: {exp_r:.3f}")
     print(f"+ Extraction/boost -> P@5: {hyb_p:.3f} | R@5: {hyb_r:.3f}")
-    '''
