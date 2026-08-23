@@ -1,12 +1,12 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch
 
-fastapi==0.141.1
-uvicorn==0.52.4
-pandas==3.0.5
-numpy==2.5.2
-scikit-learn==1.9.0
-sentence-transformers==6.0.0
-groq==1.6.0
-python-dotenv==1.2.3
-requests==2.34.2
+fastapi
+uvicorn
+pandas
+numpy
+scikit-learn
+sentence-transformers
+groq
+python-dotenv
+requests
