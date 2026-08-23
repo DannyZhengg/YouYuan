@@ -4,7 +4,7 @@ from pathlib import Path
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-MODEL_NAME = "all-mpnet-base-v2"
+MODEL_NAME = "all-MiniLM-L6-v2"
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
 COLUMNS_FOR_API = ["id", "soup", "similarity", "content_type", "genres", "tags", "cover", "date"]
 
