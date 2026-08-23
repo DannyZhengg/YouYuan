@@ -12,4 +12,6 @@ data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/processed/queries.json
+!data/processed/clean_dramas.pkl
+!data/processed/embeddings.npy
 .ipynb_checkpoints/
