@@ -1,5 +1,6 @@
 import sys
 from pathlib import Path
+import pandas as pd
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -12,10 +13,16 @@ from recommendation.llm import extract_preferences
 
 app = FastAPI(title="YouYuan API")
 
-# Allow your frontend (running on a different port/origin during local dev) to call this API
+origins = [
+    "http://localhost:8080",
+    "http://localhost:5173",
+    "http://127.0.0.1:8080",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten this to your actual frontend URL before deploying
+    allow_origins=origins,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -29,10 +36,15 @@ print(f"Loaded {len(df)} titles.")
 
 
 class SearchResult(BaseModel):
+    id: str
     title: str
-    content_type: str
+    genre: str
+    type: str
+    year: int | None
+    cover: str | None
     similarity: float
-    synopsis: str
+    note: str
+    tags: list[str]
 
 
 class SearchResponse(BaseModel):
@@ -43,12 +55,25 @@ class SearchResponse(BaseModel):
 def row_to_result(row) -> SearchResult:
     soup_lines = row["soup"].split("\n")
     title = soup_lines[0].replace("Title: ", "")
-    synopsis = row["soup"].split("Description: ")[-1][:200]  # short preview
+
+    genres_list = [g["name"] for g in row["genres"]] if isinstance(row["genres"], list) else []
+    tags_list = [t["name"] for t in row["tags"]] if isinstance(row["tags"], list) else []
+    genre = genres_list[0] if genres_list else "Drama"
+
+    year = row["date"].year if pd.notnull(row.get("date")) else None
+    synopsis = row["soup"].split("Description: ")[-1]
+    note = synopsis[:120] + ("…" if len(synopsis) > 120 else "")
+
     return SearchResult(
+        id=str(row["id"]),
         title=title,
-        content_type=row["content_type"],
+        genre=genre,
+        type=row["content_type"],
+        year=year,
+        cover=row.get("cover") if pd.notnull(row.get("cover")) else None,
         similarity=round(float(row.get("similarity", row.get("boosted_score", 0))), 3),
-        synopsis=synopsis,
+        note=note,
+        tags=tags_list[:5],
     )
 
 

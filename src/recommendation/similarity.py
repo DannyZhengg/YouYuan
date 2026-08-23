@@ -6,6 +6,8 @@ from sentence_transformers import SentenceTransformer
 
 MODEL_NAME = "all-mpnet-base-v2"
 DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
+COLUMNS_FOR_API = ["id", "soup", "similarity", "content_type", "genres", "tags", "cover", "date"]
+
 
 def load_data():
     df = pd.read_pickle(DATA_DIR / "clean_dramas.pkl")
@@ -24,7 +26,7 @@ def search(query, df, embeddings, model, k=10):
     results["similarity"] = sims
     results = results.sort_values("similarity", ascending=False)
 
-    return results.head(k)[["soup", "similarity", "content_type"]]
+    return results.head(k)[COLUMNS_FOR_API]
 
 def hybrid_search(query, df, embeddings, model, prefs, k=5):
     base_results = search(query, df, embeddings, model, k=20)  # wider pool to re-rank from
@@ -44,7 +46,9 @@ def hybrid_search(query, df, embeddings, model, prefs, k=5):
         return score
 
     base_results["boosted_score"] = base_results.apply(boost_score, axis=1)
-    return base_results.sort_values("boosted_score", ascending=False).head(k)
+    result = base_results.sort_values("boosted_score", ascending=False).head(k).copy()
+    result["similarity"] = result["boosted_score"]  # so row_to_result's similarity field reflects the boosted score
+    return result[COLUMNS_FOR_API]
 
 if __name__ == "__main__":
     df, embeddings = load_data()

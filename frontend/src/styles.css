@@ -1,0 +1,166 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * YouYuan — "Ink + Jade" design system.
+ * Palette: deep ink, dark ink, jade, light jade, antique gold, warm ivory,
+ * mist gray, soft beige. All values in oklch.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ink: var(--ink);
+  --color-ink-deep: var(--ink-deep);
+  --color-jade: var(--jade);
+  --color-jade-light: var(--jade-light);
+  --color-gold: var(--gold);
+  --color-ivory: var(--ivory);
+  --color-mist: var(--mist);
+  --color-beige: var(--beige);
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.125rem;
+
+  /* Raw palette */
+  --ink-deep: oklch(0.169 0.008 179.4); /* #101515 */
+  --ink: oklch(0.215 0.008 168.5); /* #1A1F1E */
+  --jade: oklch(0.516 0.039 172.3); /* #527A70 */
+  --jade-light: oklch(0.65 0.034 164.5); /* #819D91 */
+  --gold: oklch(0.735 0.077 82.5); /* #C9A96E */
+  --ivory: oklch(0.936 0.021 88.4); /* #F2EBDD */
+  --mist: oklch(0.288 0.009 166.7); /* #2C3331 */
+  --beige: oklch(0.712 0.006 145.6); /* #A8ADA6 */
+
+  /* Semantic */
+  --background: var(--ink-deep);
+  --foreground: var(--ivory);
+  --card: var(--ink);
+  --card-foreground: var(--ivory);
+  --popover: var(--ink);
+  --popover-foreground: var(--ivory);
+  --primary: var(--jade);
+  --primary-foreground: var(--ivory);
+  --secondary: var(--mist);
+  --secondary-foreground: var(--ivory);
+  --muted: var(--mist);
+  --muted-foreground: var(--beige);
+  --accent: var(--gold);
+  --accent-foreground: var(--ink-deep);
+  --destructive: oklch(0.55 0.16 25);
+  --destructive-foreground: var(--ivory);
+  --border: oklch(0.35 0.012 168 / 45%);
+  --input: oklch(0.35 0.012 168 / 45%);
+  --ring: var(--jade);
+
+  --shadow-cinematic: 0 30px 60px -30px oklch(0 0 0 / 85%);
+  --ease-silk: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.dark {
+  color-scheme: dark;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--gold) 30%, transparent);
+    color: var(--ivory);
+  }
+}
+
+@utility font-display {
+  font-family: var(--font-display);
+  font-weight: 400;
+}
+
+/* Vertical seal-script style label */
+@utility vertical-text {
+  writing-mode: vertical-rl;
+  letter-spacing: 0.4em;
+}
+
+/* Slow cinematic reveal on scroll */
+@utility reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 1.4s var(--ease-silk),
+    transform 1.4s var(--ease-silk);
+
+  &[data-visible="true"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@utility ink-fade-left {
+  mask-image: linear-gradient(
+      to right,
+      transparent 0%,
+      black 22%,
+      black 62%,
+      transparent 98%
+    ),
+    linear-gradient(to bottom, transparent 0%, black 14%, black 62%, transparent 96%);
+  mask-composite: intersect;
+  -webkit-mask-composite: source-in;
+}
+
+@utility poster-frame {
+  border: 1px solid color-mix(in oklab, var(--jade) 25%, transparent);
+  transition:
+    transform 0.9s var(--ease-silk),
+    border-color 0.9s var(--ease-silk),
+    box-shadow 0.9s var(--ease-silk);
+
+  &:hover {
+    transform: translateY(-10px);
+    border-color: color-mix(in oklab, var(--gold) 55%, transparent);
+    box-shadow: var(--shadow-cinematic);
+  }
+}
