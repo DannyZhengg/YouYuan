@@ -76,6 +76,8 @@ Real methodology bugs along the way, worth naming since they changed the actual 
 
 Results, measured against that 30-query benchmark:
 
+![YouYuan Evaluation Benchmark Chart](assets/evalG.png)
+
 [chart shown above]
 
 **The negative result is the part worth actually explaining.** My first attempted improvement was an LLM rewriting short queries into richer descriptive text before embedding — the idea being that "historical romance with political intrigue" is short and ambiguous, so give it more to work with. It made things worse. Across several prompt attempts (explicit format constraints, a one-shot example, `temperature=0`), the model reliably produced narrative prose — *"a brooding, rain-slick metropolis where neon flickers..."* — instead of anything resembling my corpus's dense, structured `Genres:`/`Tags:` format. That's a real style mismatch, and embeddings are sensitive to surface form, not just meaning — a beautifully written paragraph about a detective story embeds nowhere near a terse metadata listing about a detective story, even though a human would call them "about the same thing."
