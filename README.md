@@ -67,7 +67,7 @@ Deploying on Render's 512MB RAM free tier exposed immediate memory limits when l
 * **Hybrid Re-ranking:** Precision@5 dropped from **0.120** to **0.072**.
 * **System Delta:** The hybrid Groq LLM re-ranking layer maintained a consistent **~1.8x relative performance lift** over raw cosine search regardless of the underlying embedding model, confirming that the re-ranking logic functions independently of base vector quality.
 
-## Current Market Solutions
+## On The Shelf Options
 
 Realistically, LangChain and a hosted vector DB would get you most of the retrieval pipeline in a fraction of the code. I deliberately didn't use them — partly because I wanted to actually understand and debug the pipeline myself (which mattered directly: the index/position bug above was only catchable because I was working with the raw dataframe and embedding array directly, not through an abstraction that hid that relationship), and partly because at 3,492 rows, none of the complexity those tools solve for was actually a problem I had.
 
