@@ -12,39 +12,13 @@ That question became YouYuan, a semantic recommendation engine designed to help 
 
 ## Overview
 
-At its core, this project has three pieces: a semantic retrieval layer, an LLM re-ranking layer, and a full-stack app around both of them.
+YouYuan is built on a two-stage hybrid retrieval architecture consisting of an offline preprocessing pipeline, an in-memory vector search layer, and a structured LLM re-ranking engine.
 
-```
-Raw dataset (4 files, 19,274 rows)
-        │
-        ▼
-   Clean + merge → 3,492 titles
-        │
-        ▼
-   Embed every title (sentence-transformers)
-        │
-        ▼
-   ┌─────────────────────────┐
-   │  User types a query      │
-   └────────────┬─────────────┘
-                ▼
-   Embed the query, cosine similarity
-   against all 3,492 title vectors
-                │
-                ▼
-   Top-K candidates
-                │
-                ▼
-   LLM extracts structured preferences
-   (genres / themes / exclusions, JSON mode)
-                │
-                ▼
-   Boost/penalize candidates by keyword
-   match against the dataset's own metadata
-                │
-                ▼
-   Final ranked list → React frontend
-```
+### Data & Embedding Pipeline (Offline)
+![YouYuan Offline Preprocessing Pipeline](assets/offline.png)
+
+### Semantic Recommendation Engine (Online)
+![YouYuan Online Semantic Search Pipeline](assets/Online.png)
 
 I didn't go for a vector database or a framework like LangChain for any of this. At 3,492 rows, brute-force cosine similarity is fast enough that a vector DB adds nothing but complexity, and I wanted to own the retrieval pipeline myself and to understand it. The one hard architectural rule I kept throughout: the LLM explains and re-ranks, but it never invents. Every recommendation traces back to real embedding similarity over the real dataset.
 
