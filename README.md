@@ -19,7 +19,7 @@ YouYuan is built on a two-stage hybrid retrieval architecture consisting of an o
 
 ### Semantic Recommendation Engine (Online)
 ![YouYuan Online Semantic Search Pipeline](assets/Online.png)
-[The cosine similarity takes in the embedding.npy and the query embedding to produce a similarity score]
+*Note: Cosine similarity is computed directly between the pre-computed `embeddings.npy` array and the incoming 384-dimensional query embedding to produce candidate similarity scores.*
 
 ## Dataset
 
