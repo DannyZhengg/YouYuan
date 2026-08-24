@@ -74,7 +74,7 @@ Real methodology bugs along the way, worth naming since they changed the actual 
 
 Results, measured against that 30-query benchmark:
 
-![YouYuan Evaluation Benchmark Chart](assets/evalG.png)
+![YouYuan Evaluation Benchmark Chart](assets/eval_graph.png)
 
 **Query Expansion (Failed Experiment):** I initially tried having an LLM expand short user prompts into descriptive text prior to vector search. This degraded performance. Even with strict system prompts, temperature set to `0`, and one-shot examples, the LLM generated narrative prose rather than the concise, comma-separated tags present in the target metadata. Because embedding models are highly sensitive to text structure and density, rich descriptive paragraphs shifted the query vector away from the corpus's terse metadata style.
 
