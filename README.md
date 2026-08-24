@@ -21,8 +21,6 @@ YouYuan is built on a two-stage hybrid retrieval architecture consisting of an o
 ![YouYuan Online Semantic Search Pipeline](assets/Online.png)
 [The cosine similarity takes in the embedding.npy and the query embedding to produce a similarity score]
 
-I didn't go for a vector database or a framework like LangChain for any of this. At 3,492 rows, brute-force cosine similarity is fast enough that a vector DB adds nothing but complexity, and I wanted to own the retrieval pipeline myself and to understand it. The one hard architectural rule I kept throughout: the LLM explains and re-ranks, but it never invents. Every recommendation traces back to real embedding similarity over the real dataset.
-
 ## Dataset
 
 I used Kaggle's [Asian Drama Dataset](https://www.kaggle.com/datasets/lakhindarpal/asian-drama-dataset), which ships as four separate files by content type — dramas, movies, TV shows, specials. I loaded and merged all four (19,274 rows total), tagged each with its `content_type`, filtered to `country == China`, and cleaned down to **3,492 titles**.
