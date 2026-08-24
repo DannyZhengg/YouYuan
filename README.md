@@ -1,16 +1,14 @@
-# YouYuan 有缘 — a semantic recommendation engine for Chinese dramas, built to find what you mean, not just what you type
+# YouYuan 有缘 — a semantic recommendation engine for Chinese dramas
 
 Live demo: https://youyuan-coral.vercel.app
 
-This is a write-up of a solo, one-week (ish) project where I built a recommendation engine for Chinese dramas, movies, TV shows, and specials, from a raw dataset up through a deployed full-stack app. I'll walk through the pipeline, the evaluation methodology I designed, a genuine dead end I hit and how I diagnosed it, and the infrastructure fight that came with actually deploying it.
-
 ## Motivation
 
-I grew up watching Chinese dramas as a way to stay connected to my heritage as an Asian American, and I noticed something: KDramas have gone properly global — *Squid Game*, *All of Us Are Dead* — but CDramas still sit in the shadow of that, despite having just as much going for them. I also know how tedious it is to find something to watch when you don't already know the genre or the language — scrolling forums, watching trailers, hoping something clicks.
+I grew up watching Chinese shows as a way to stay connected to my heritage, and C-Dramas became a way for me to practice Chinese while experiencing stories and aspects of Chinese culture that felt different from what I grew up with in the US. While K-Dramas have gone properly global, *Goblin*, but C-Dramas still sit in the shadow of that, despite having just as much going for them. I also know how tedious it is to find something to watch when you don't already know the genre or the language. 
 
-So the actual product question I wanted to answer was: can you describe what you're in the mood for in your own words — *"a slow-burn palace romance with a clever heroine"* — and get something that actually matches the meaning of that, not just a genre filter?
+So I wanted to build a better way to discover them: what if you could simply describe what you're in the mood for, "An exiled martial arts master hiding their true identity in a rural fish-farming border town.", and get recommendations that actually understand what you mean, rather than just matching keywords or genres? 
 
-The name comes from 有缘 (yǒuyuán) — "to have a fated connection." It's a phrase CDrama fans actually use, and it maps cleanly onto what a recommendation engine is supposed to do: find the thing you were meant to find.
+That question became YouYuan, a semantic recommendation engine designed to help people discover C-dramas through natural language. The name comes from 有缘 (yǒuyuán) — "to have a fated connection."
 
 ## Overview
 
@@ -48,13 +46,13 @@ Raw dataset (4 files, 19,274 rows)
    Final ranked list → React frontend
 ```
 
-I didn't reach for a vector database or a framework like LangChain for any of this. At 3,492 rows, brute-force cosine similarity is fast enough that a vector DB buys nothing but complexity, and I wanted to own the retrieval pipeline myself — partly to actually understand it, partly because it turned out to matter (more on that below). The one hard architectural rule I kept throughout: the LLM explains and re-ranks, it never invents. Every recommendation traces back to real embedding similarity over the real dataset.
+I didn't go for a vector database or a framework like LangChain for any of this. At 3,492 rows, brute-force cosine similarity is fast enough that a vector DB adds nothing but complexity, and I wanted to own the retrieval pipeline myself and to understand it. The one hard architectural rule I kept throughout: the LLM explains and re-ranks, but it never invents. Every recommendation traces back to real embedding similarity over the real dataset.
 
 ## Dataset
 
-Kaggle's [Asian Drama Dataset](https://www.kaggle.com/datasets/lakhindarpal/asian-drama-dataset), which ships as four separate files by content type — dramas, movies, TV shows, specials. I loaded and merged all four (19,274 rows total), tagged each with its `content_type`, filtered to `country == China`, and cleaned/deduped down to **3,492 titles**.
+Kaggle's [Asian Drama Dataset](https://www.kaggle.com/datasets/lakhindarpal/asian-drama-dataset), which ships as four separate files by content type — dramas, movies, TV shows, specials. I loaded and merged all four (19,274 rows total), tagged each with its `content_type`, filtered to `country == China`, and cleaned down to **3,492 titles**.
 
-Each title gets converted into a combined text "soup" before embedding — title, type, genres, tags, cast, year, description — since embedding just the title is close to useless:
+Each title gets converted into a combined text "soup" before embedding — title, type, genres, tags, cast, year, description — since embedding with just the title is not particularly useful:
 
 ```
 Title: Nirvana in Fire
@@ -70,9 +68,9 @@ The source files are nested JSON (genres and tags are lists of `{name, id}` dict
 
 ## Evaluation
 
-This is the part I actually put the most thought into, because "does this work" is the question every recommendation project claims to answer and most don't actually measure.
+This is a very important step, because "does this work" is the question every recommendation project claims to answer and most don't actually measure.
 
-**The obvious approach — hand-label 50-100 queries myself — has a real problem: it mostly measures my own taste, and it's brutally tedious at that scale.** So instead, ground truth for a 30-query benchmark comes from **MyDramaList's crowd-sourced "similar title" recommendation data**, pulled via an unofficial API. For each test query, I picked a seed drama matching its genre/mood, fetched MDL's community-recommended titles for that seed, cross-referenced them against my own dataset, and used what survived as the relevance labels — a filter with a minimum vote threshold to weed out low-confidence one-off suggestions.
+**The obvious approach is to hand-label 50-100 queries myself, this has a problem: it mostly measures my own taste (introduce a lot of bias), and it's brutally tedious at that scale.** So instead, ground truth for a 30-query benchmark comes from **MyDramaList's crowd-sourced "similar title" recommendation data**, pulled via an unofficial API. For each test query, I picked a seed drama matching its genre/mood, fetched MDL's community-recommended titles for that seed, cross-referenced them against my own dataset, and used what survived as the relevance labels — a filter with a minimum vote threshold to weed out low-confidence one-off suggestions.
 
 Real methodology bugs along the way, worth naming since they changed the actual numbers: the API's search sometimes resolves an ambiguous title to the wrong show entirely (multiple unrelated dramas can share an exact title — I hit this with "The Bad Kids," "The Double," and a few others), fixed with a manual disambiguation list cross-checked against year and synopsis. The initial minimum-vote threshold (5) was too strict — plenty of genuinely good MDL recommendations have very low vote counts — lowered to 1 after checking the raw data.
 
@@ -111,7 +109,7 @@ Realistically, LangChain and a hosted vector DB would get you most of the retrie
 
 ## Stack
 
-Python, pandas, sentence-transformers, scikit-learn (cosine similarity, brute-force), Groq (JSON-mode structured extraction), FastAPI, React + TanStack, GSAP. Backend deployed on Google Cloud Run, frontend on Vercel.
+Python, pandas, sentence-transformers, scikit-learn (cosine similarity), Groq, FastAPI, React + TanStack, GSAP. Backend deployed on Google Cloud Run, frontend on Vercel.
 
 ## Running it locally
 
@@ -147,5 +145,3 @@ YouYuan/
 ├── data/processed/       # cleaned dataset, embeddings, eval query set
 └── DESIGN.md              # full design & methodology document
 ```
-
-See `DESIGN.md` for the complete design rationale and every architectural decision behind it.
