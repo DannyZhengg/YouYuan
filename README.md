@@ -1,98 +1,120 @@
-# YouYuan 有缘
- 
-*A semantic recommendation engine for Chinese dramas, movies, TV shows, and specials — find your next story by meaning, mood, and emotion, not just genre tags.*
- 
-**[Live Demo →](#)** *(add link once deployed)*
- 
----
- 
-## What this is
- 
-Discovering a Chinese drama that matches what you're actually in the mood for is hard — most platforms rely on generic genre tags with no way to describe what you want in your own words, and no explanation for why something was recommended.
- 
-YouYuan takes a free-text query — *"a slow-burn palace romance with a clever heroine"* — and returns relevant titles from a 3,492-title catalog, using transformer-based semantic embeddings rather than keyword matching, refined by an LLM layer that extracts your specific preferences and re-ranks results. Every recommendation traces back to a real title in the dataset — the LLM explains and re-ranks, it never invents.
- 
-The name comes from 有缘 (yǒuyuán) — "to have a fated connection."
- 
-## Architecture
- 
+# YouYuan 有缘 — a semantic recommendation engine for Chinese dramas, built to find what you mean, not just what you type
+
+Live demo: https://youyuan-coral.vercel.app
+
+This is a write-up of a solo, one-week (ish) project where I built a recommendation engine for Chinese dramas, movies, TV shows, and specials, from a raw dataset up through a deployed full-stack app. I'll walk through the pipeline, the evaluation methodology I designed, a genuine dead end I hit and how I diagnosed it, and the infrastructure fight that came with actually deploying it.
+
+## Motivation
+
+I grew up watching Chinese dramas as a way to stay connected to my heritage as an Asian American, and I noticed something: KDramas have gone properly global — *Squid Game*, *All of Us Are Dead* — but CDramas still sit in the shadow of that, despite having just as much going for them. I also know how tedious it is to find something to watch when you don't already know the genre or the language — scrolling forums, watching trailers, hoping something clicks.
+
+So the actual product question I wanted to answer was: can you describe what you're in the mood for in your own words — *"a slow-burn palace romance with a clever heroine"* — and get something that actually matches the meaning of that, not just a genre filter?
+
+The name comes from 有缘 (yǒuyuán) — "to have a fated connection." It's a phrase CDrama fans actually use, and it maps cleanly onto what a recommendation engine is supposed to do: find the thing you were meant to find.
+
+## Overview
+
+At its core, this project has three pieces: a semantic retrieval layer, an LLM re-ranking layer, and a full-stack app around both of them.
+
 ```
-User query
-    │
-    ▼
-FastAPI backend
-    │
-    ▼
-Sentence-Transformer embedding (all-mpnet-base-v2)
-    │
-    ▼
-Cosine similarity vs. all title embeddings (brute-force, in-memory)
-    │
-    ▼
-Top-K candidates
-    │
-    ▼
-Groq LLM: JSON-mode preference extraction (genres/themes/exclusions)
-    │
-    ▼
-Metadata-boosted re-ranking
-    │
-    ▼
-JSON response → React frontend
+Raw dataset (4 files, 19,274 rows)
+        │
+        ▼
+   Clean + merge → 3,492 titles
+        │
+        ▼
+   Embed every title (sentence-transformers)
+        │
+        ▼
+   ┌─────────────────────────┐
+   │  User types a query      │
+   └────────────┬─────────────┘
+                ▼
+   Embed the query, cosine similarity
+   against all 3,492 title vectors
+                │
+                ▼
+   Top-K candidates
+                │
+                ▼
+   LLM extracts structured preferences
+   (genres / themes / exclusions, JSON mode)
+                │
+                ▼
+   Boost/penalize candidates by keyword
+   match against the dataset's own metadata
+                │
+                ▼
+   Final ranked list → React frontend
 ```
- 
-**Design principle:** the LLM explains and re-ranks recommendations — it never generates them. Retrieval always originates from real embedding similarity over the actual dataset, which keeps the system grounded and avoids hallucinated picks. This also means there's no database — the dataset is static and read-only at request time, loaded once from flat files into memory at server startup.
- 
-## Stack
- 
-| Layer | Tool |
-|---|---|
-| Data | Python, pandas, NumPy |
-| Embeddings | sentence-transformers (`all-mpnet-base-v2`) |
-| Similarity search | scikit-learn cosine similarity (brute-force, in-memory — no vector DB needed at this scale) |
-| LLM layer | Groq (`openai/gpt-oss-120b`), JSON-mode structured extraction |
-| Backend | FastAPI |
-| Frontend | React, TanStack Router/Start, Tailwind, GSAP |
-| Ground-truth data source | MyDramaList community recommendation data, via an unofficial API |
- 
+
+I didn't reach for a vector database or a framework like LangChain for any of this. At 3,492 rows, brute-force cosine similarity is fast enough that a vector DB buys nothing but complexity, and I wanted to own the retrieval pipeline myself — partly to actually understand it, partly because it turned out to matter (more on that below). The one hard architectural rule I kept throughout: the LLM explains and re-ranks, it never invents. Every recommendation traces back to real embedding similarity over the real dataset.
+
 ## Dataset
- 
-Kaggle's [Asian Drama Dataset](https://www.kaggle.com/datasets/lakhindarpal/asian-drama-dataset) (dramas, movies, TV shows, and specials — 19,274 rows total), filtered to `country == China` and cleaned down to **3,492 titles**. Each title is represented as a combined text "soup" — title, genres, tags, cast, year, and synopsis — before being embedded.
- 
+
+Kaggle's [Asian Drama Dataset](https://www.kaggle.com/datasets/lakhindarpal/asian-drama-dataset), which ships as four separate files by content type — dramas, movies, TV shows, specials. I loaded and merged all four (19,274 rows total), tagged each with its `content_type`, filtered to `country == China`, and cleaned/deduped down to **3,492 titles**.
+
+Each title gets converted into a combined text "soup" before embedding — title, type, genres, tags, cast, year, description — since embedding just the title is close to useless:
+
+```
+Title: Nirvana in Fire
+Type: drama
+Genres: Military, Historical, Drama, Political
+Tags: Power Struggle, Smart Male Lead, Scheme, Hidden Identity, Revenge
+Cast: Hu Ge, Liu Tao, Wang Kai...
+Year: 2015
+Description: In sixth-century China, the Emperor of Great Liang...
+```
+
+The source files are nested JSON (genres and tags are lists of `{name, id}` dicts, cast is nested under `main`/`support`), and the four files don't share identical schemas — movies have no episode count, TV shows have no director field — so the cleaning step has to flatten everything defensively rather than assume a fixed shape.
+
 ## Evaluation
- 
-Rather than hand-labeling relevance from memory (which mostly measures the author's own taste and is highly tedious at scale), ground truth for a 30-query evaluation set was sourced from **MyDramaList's crowd-sourced "similar title" recommendation data**: for each query, a seed drama matching its genre/mood was chosen, and MDL's community-recommended titles for that seed — cross-referenced against this project's own dataset — became the relevance labels.
- 
-| System | Precision@5 | Recall@5 |
-|---|---|---|
-| Semantic baseline | 0.096 | 0.053 |
-| LLM query expansion *(rejected)* | 0.056 | 0.025 |
-| **LLM preference extraction + metadata re-ranking** | **0.120** | **0.065** |
- 
-*Recall@5 is mechanically capped well below 1.0 for queries with large (20-40 title) ground-truth sets, since only 5 results are compared against a much larger relevant pool — this is a metric ceiling effect, not purely a retrieval-quality signal.*
- 
-### A negative result, kept rather than hidden
- 
-The first attempted improvement — an LLM rewriting short queries into richer descriptive text before embedding — measurably **hurt** precision. Across multiple prompt-engineering attempts (explicit format constraints, a one-shot example, `temperature=0`), the model reliably produced narrative prose (*"a brooding, rain-slick metropolis..."*) instead of corpus-matching keyword text, creating a style mismatch with the dataset's structured metadata that embeddings are sensitive to.
- 
-The fix that worked was a structurally different approach, not a better prompt: Groq's forced JSON mode to extract structured genre/theme keywords, used to boost/penalize the existing semantic search results by direct keyword match against the dataset's own metadata — never touching the embedding step at all. JSON-schema compliance proved far more reliable than free-text format instructions in every test.
- 
+
+This is the part I actually put the most thought into, because "does this work" is the question every recommendation project claims to answer and most don't actually measure.
+
+**The obvious approach — hand-label 50-100 queries myself — has a real problem: it mostly measures my own taste, and it's brutally tedious at that scale.** So instead, ground truth for a 30-query benchmark comes from **MyDramaList's crowd-sourced "similar title" recommendation data**, pulled via an unofficial API. For each test query, I picked a seed drama matching its genre/mood, fetched MDL's community-recommended titles for that seed, cross-referenced them against my own dataset, and used what survived as the relevance labels — a filter with a minimum vote threshold to weed out low-confidence one-off suggestions.
+
+Real methodology bugs along the way, worth naming since they changed the actual numbers: the API's search sometimes resolves an ambiguous title to the wrong show entirely (multiple unrelated dramas can share an exact title — I hit this with "The Bad Kids," "The Double," and a few others), fixed with a manual disambiguation list cross-checked against year and synopsis. The initial minimum-vote threshold (5) was too strict — plenty of genuinely good MDL recommendations have very low vote counts — lowered to 1 after checking the raw data.
+
+Results, measured against that 30-query benchmark:
+
+[chart shown above]
+
+**The negative result is the part worth actually explaining.** My first attempted improvement was an LLM rewriting short queries into richer descriptive text before embedding — the idea being that "historical romance with political intrigue" is short and ambiguous, so give it more to work with. It made things worse. Across several prompt attempts (explicit format constraints, a one-shot example, `temperature=0`), the model reliably produced narrative prose — *"a brooding, rain-slick metropolis where neon flickers..."* — instead of anything resembling my corpus's dense, structured `Genres:`/`Tags:` format. That's a real style mismatch, and embeddings are sensitive to surface form, not just meaning — a beautifully written paragraph about a detective story embeds nowhere near a terse metadata listing about a detective story, even though a human would call them "about the same thing."
+
+The fix that worked wasn't a better prompt — it was a different architecture. I switched to Groq's forced JSON mode to extract structured genre/theme/exclusion keywords, then used those to boost or penalize the existing semantic search results by direct keyword match against the dataset's own metadata, never touching the embedding step at all. JSON-schema compliance turned out to be far more reliable than free-text format instructions, and sidestepping the embedding entirely avoided the style-mismatch problem structurally instead of trying to prompt-engineer around it.
+
+## Deployment
+
+This part didn't go smoothly, and I think it's worth documenting honestly rather than pretending it was one clean `git push`.
+
+I built and evaluated everything against `all-mpnet-base-v2`. Deploying it hit a wall immediately: Render's free tier caps at 512MB RAM, and a PyTorch + sentence-transformers stack blows past that before you've even loaded a model, let alone the encoding step. I swapped to the much smaller `all-MiniLM-L6-v2` — still OOM'd. I stripped `requirements.txt`, which turned out to be a raw `pip freeze` of my entire dev environment (it had `chromadb`, `gradio`, and Jupyter tooling in it — none of which the actual server uses) — still OOM'd, even with the lighter model and a trimmed dependency list.
+
+At that point the honest read was that 512MB just isn't enough for this kind of app, full stop, regardless of which specific fix I tried next. Render's cheapest paid tier turned out not to help either — Starter is $7/month but *still* 512MB; the RAM bump only comes at Standard ($25/month). I moved the backend to **Google Cloud Run** instead, which lets you configure memory allocation directly and has a genuinely usable free tier for a low-traffic demo. That's what's actually running the live version now, on the smaller MiniLM model.
+
+The honest cost of that model swap: retrieval quality measurably drops with MiniLM (Precision@5 0.096 → 0.040 on baseline, 0.120 → 0.072 on the hybrid approach) — but the *relative* improvement from the re-ranking approach holds almost exactly the same (roughly 1.8x over baseline either way), which tells me the re-ranking logic itself is doing real, model-independent work; the cost is entirely in base retrieval quality from the smaller model. That's a real infrastructure tradeoff, made under a real constraint, and I'd rather report it than hide it.
+
+## Other real bugs, worth naming
+
+- **Silent data-integrity bug:** after `dropna`/`drop_duplicates`, the dataframe's index had gaps, which meant positional embedding lookups (`embeddings[idx]`) and label-based lookups (`df.loc[idx]`) silently disagreed — the wrong vector for a given row, no error thrown. Fixed with `reset_index(drop=True)`, caught by a nearest-neighbor sanity check that returned nonsense until it didn't.
+- **Deprecated model ID:** an AI coding assistant suggested a Groq model name that had actually been deprecated days earlier. Caught by checking Groq's current docs before running, not by trusting the suggestion — worth remembering that any assistant's knowledge of a fast-moving API can be stale.
+
+## What I'd have used off-the-shelf
+
+Realistically, LangChain and a hosted vector DB would get you most of the retrieval pipeline in a fraction of the code. I deliberately didn't use them — partly because I wanted to actually understand and debug the pipeline myself (which mattered directly: the index/position bug above was only catchable because I was working with the raw dataframe and embedding array directly, not through an abstraction that hid that relationship), and partly because at 3,492 rows, none of the complexity those tools solve for was actually a problem I had.
+
 ## Known limitations
- 
-- Subjective, unlabeled query attributes (e.g. "handsome/pretty leads") aren't supported — the dataset has no signal for this, and it's a data-availability problem rather than a retrieval-quality one.
-- The evaluation benchmark (30 queries, MDL-sourced) is smaller in scale than industry benchmarks by design — the goal was a defensible, bias-reduced methodology, not a comprehensive one.
-- No personalization, watch history, or user accounts — deliberately out of scope (see below).
-## Deliberately out of scope
- 
-Personalized profiles/watch history, multimodal (poster-image) embeddings, reranking/cross-encoder models, a persistence database (the dataset is static and read-only, so one was never needed), and competing with existing datasets' scale.
- 
-## Real bugs hit along the way
- 
-- **Silent data-integrity bug:** a pandas index/position mismatch after `dropna`/`drop_duplicates` caused positional embedding lookups to silently return the wrong row's vector — fixed with `reset_index(drop=True)` and verified via nearest-neighbor spot checks.
-- **Third-party API ambiguity:** MyDramaList search sometimes resolved an ambiguous title (multiple unrelated shows sharing an exact name) to the wrong show — fixed via a manual disambiguation list, cross-checked against year/synopsis.
-- **Deprecated model ID:** an AI-suggested Groq model name (`llama-3.3-70b-versatile`) had been deprecated days earlier — caught by verifying against current docs before running, not by trusting the suggestion.
+
+- Subjective, unlabeled attributes ("handsome lead," "pretty visuals") aren't supported — the dataset has no signal for this, and it's a data-availability gap, not a retrieval-quality one.
+- The 30-query MDL-sourced benchmark is small by design — the goal was a defensible, less-biased methodology, not comprehensive coverage.
+- No personalization, watch history, or accounts — deliberately out of scope; the whole system is stateless and reads from flat files loaded once into memory, which is also why there's no database.
+
+## Stack
+
+Python, pandas, sentence-transformers, scikit-learn (cosine similarity, brute-force), Groq (JSON-mode structured extraction), FastAPI, React + TanStack, GSAP. Backend deployed on Google Cloud Run, frontend on Vercel.
+
 ## Running it locally
- 
+
 ```bash
 # Backend
 python -m venv venv && source venv/bin/activate
@@ -100,30 +122,30 @@ pip install -r requirements.txt
 python src/data/preprocess.py
 python src/embeddings/embed.py
 uvicorn app.main:app --reload --port 8000
- 
+
 # Frontend (separate terminal)
 cd frontend
 npm install
 npm run dev
 ```
- 
-Requires a free [Groq API key](https://console.groq.com) in a `.env` file:
+
+Needs a free [Groq API key](https://console.groq.com) in a `.env` file:
 ```
 GROQ_API_KEY=your_key_here
 ```
- 
+
 ## Project structure
- 
+
 ```
 YouYuan/
 ├── src/
-│   ├── data/            # dataset loading, cleaning, MyDramaList eval integration
-│   ├── embeddings/       # sentence-transformer embedding generation
+│   ├── data/            # loading, cleaning, MyDramaList eval integration
+│   ├── embeddings/       # embedding generation
 │   └── recommendation/   # search, hybrid re-ranking, evaluation
 ├── app/                  # FastAPI backend
 ├── frontend/              # React + TanStack frontend
 ├── data/processed/       # cleaned dataset, embeddings, eval query set
 └── DESIGN.md              # full design & methodology document
 ```
- 
-See `DESIGN.md` for the complete design rationale, including every architectural decision and why it was made.
+
+See `DESIGN.md` for the complete design rationale and every architectural decision behind it.
