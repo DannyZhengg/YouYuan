@@ -113,5 +113,4 @@ YouYuan/
 ├── app/                  # FastAPI backend
 ├── frontend/              # React + TanStack frontend
 ├── data/processed/       # cleaned dataset, embeddings, eval query set
-└── DESIGN.md              # full design & methodology document
 ```
